@@ -37,7 +37,7 @@
             color: var(--text-color-dark);
             line-height: 1.5;
             font-size: 15px;
-            /* Ensure body doesn't create extra scrollbars from scaled content */
+            /* Allow content scrolling */
             overflow: hidden; 
         }
 
@@ -284,7 +284,7 @@
         }
         
         .metrics-grid {
-            display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;
         }
         .metric-card {
             padding: 20px; border-radius: 6px; text-align: center;
@@ -573,16 +573,20 @@
 
                     <div class="metrics-grid">
                         <div class="metric-card">
-                            <div class="label">Total Present</div>
-                            <div class="value present-color">25</div>
+                            <div class="label">Full-Time (FT) Present</div>
+                            <div class="value present-color">20</div>
                         </div>
                         <div class="metric-card">
-                            <div class="label">Total Absent</div>
-                            <div class="value absent-color">3</div>
+                            <div class="label">Adhoc (AH) Present</div>
+                            <div class="value present-color">5</div>
                         </div>
                         <div class="metric-card">
-                            <div class="label">Total Staff Base</div>
-                            <div class="value" style="color: var(--primary-color);">30</div>
+                            <div class="label">Full-Time (FT) Absent</div>
+                            <div class="value absent-color">2</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="label">Adhoc (AH) Absent</div>
+                            <div class="value absent-color">1</div>
                         </div>
                     </div>
 
@@ -742,9 +746,15 @@
                         <h2>Staff Directory</h2>
                         <p class="page-subtitle">Add, view, or manage your staff records.</p>
                     </div>
-                    <button class="btn-detailed" id="show-add-staff-form">
-                        + Add New Staff
-                    </button>
+                    <!-- NEW: Button Group for actions -->
+                    <div class="flex gap-3">
+                         <button class="btn-action" id="show-bulk-upload-modal">
+                            Bulk Staff Upload
+                        </button>
+                        <button class="btn-detailed" id="show-add-staff-form">
+                            + Add New Staff
+                        </button>
+                    </div>
                 </header>
 
                 <!-- NEW FILTER BAR -->
@@ -1065,11 +1075,9 @@
             const filterLocation = document.getElementById('filter-location');
             const filterEmployee = document.getElementById('filter-employee');
             const filterDateFrom = document.getElementById('filter-date-from'); // Get the date input
-            // const applyFiltersBtn = document.querySelector('.apply-filters-btn'); // Button is removed
             
             // NEW: Staff Directory Filter Elements
             const filterStaffLocation = document.getElementById('filter-staff-location');
-            // const applyStaffFiltersBtn = document.getElementById('apply-staff-filters'); // Button is removed
             
             // NEW Dashboard Filter Elements
             const dashFilterLocationDaily = document.getElementById('dash-filter-location-daily');
@@ -1158,28 +1166,6 @@
                 });
             }
             
-            // Mock filter application
-            /*
-            if (applyFiltersBtn) {
-                applyFiltersBtn.addEventListener('click', () => {
-                    const location = filterLocation.value;
-                    const employee = filterEmployee.value;
-                    const dateFrom = document.getElementById('filter-date-from').value;
-                    const dateTo = document.getElementById('filter-date-to').value;
-                    
-                    console.log('Applying Filters:', { location, employee, dateFrom, dateTo });
-                    
-                    // In a real application, this would trigger an API call or re-render with filtered data.
-                    // If Individual Log view is active, the date range is ignored and only dateFrom is relevant.
-                    renderMonthViewCalendar();
-                    renderIndividualLogTable(mockDailyLog);
-                    
-                    // Show confirmation message (using console as per instruction)
-                    console.log(`Filters applied: Location=${location || 'All'}, Employee=${employee || 'All'}, Date Range=${dateFrom} to ${dateTo}`);
-                });
-            }
-            */
-
             // Function to apply filters on the Attendance Report page
             function applyReportFilters() {
                 if (!filterLocation || !filterEmployee || !filterDateFrom) return; // Guard clause
@@ -1210,19 +1196,6 @@
                 filterDateFrom.addEventListener('change', applyReportFilters);
             }
             
-            // NEW: Listener for Staff Directory Filter
-            /*
-            if (applyStaffFiltersBtn) {
-                applyStaffFiltersBtn.addEventListener('click', () => {
-                    const location = filterStaffLocation.value;
-                    console.log(`Applying Staff Directory Filters: Location=${location || 'All'}`);
-                    
-                    // Call a new function to filter the staff tables
-                    filterStaffDirectoryTables(location);
-                });
-            }
-            */
-
             // NEW: Add event listener for auto-apply on staff directory filter
             if (filterStaffLocation) {
                 filterStaffLocation.addEventListener('change', () => {
@@ -1549,6 +1522,9 @@
             const ftStaffTableBody = document.getElementById('ft-staff-table-body');
             const ahStaffTableBody = document.getElementById('ah-staff-table-body');
 
+            // NEW Bulk Upload Button Reference
+            const showBulkUploadBtn = document.getElementById('show-bulk-upload-modal'); 
+
             if (showAddStaffFormBtn) {
                 showAddStaffFormBtn.addEventListener('click', () => { setActiveView(addStaffView, navStaffDirectory); });
             }
@@ -1595,6 +1571,15 @@
                 });
             }
 
+            // NEW: Bulk Upload Button Listener (Mock functionality)
+            if (showBulkUploadBtn) {
+                showBulkUploadBtn.addEventListener('click', () => {
+                    console.log('Bulk Staff Upload feature clicked. A file upload modal or new view should open here.');
+                    // You would implement a file parsing/upload process here, likely accepting CSV or Excel.
+                    // Using console log as per constraint to avoid system dialogs.
+                });
+            }
+
 
             // Initial Setup Calls
             initializeMusterRoll();
@@ -1609,6 +1594,3 @@
 
 </body>
 </html>
-
-
-
