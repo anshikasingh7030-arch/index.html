@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise Attendance Dashboard (Minimalist)</title>
+    
+    <!-- Load Tailwind CSS classes for aesthetics/utility that might be missed -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        /* --- CORE STYLES & ENTERPRISE PALETTE --- */
+        :root {
+            --primary-color: #204179; /* Deep, Corporate Blue */
+            --primary-light: #f0f4f9; /* Lightest tint for backgrounds */
+            --sidebar-bg: #1f2a37; /* Dark Slate Gray for Sidebar */
+            --success-color: #15803d; /* Darker, controlled Green */
+            --danger-color: #b91c1c; /* Muted, serious Red */
+            --warning-color: #ca8a04; /* Gold/Amber for warnings */
+            --background-color: #f7f9fa; /* Off-white, soft background */
+            --card-background: #ffffff;
+            --text-color-dark: #1e293b; /* Very dark text */
+            --text-color-muted: #64748b; /* Slate gray for labels */
+            --border-color: #e2e8f0; /* Light border gray */
+            --shadow-subtle: 0 1px 3px rgba(0, 0, 0, 0.04);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color-dark);
+            line-height: 1.5;
+            font-size: 15px;
+            /* Ensure body doesn't create extra scrollbars from scaled content */
+            overflow: hidden; 
+        }
+
+        /* --- Layout & Navigation (High-Contrast Sidebar) --- */
+        .app-container { 
+            display: flex; 
+            min-height: 125vh; /* 100vh / 0.8 = 125vh */
+            
+            /* User request to "zoom out" to 80% */
+            transform: scale(0.8);
+            transform-origin: top left;
+            width: 125%; /* 100% / 0.8 = 125% */
+        }
+        .sidebar {
+            width: 200px;
+            background: var(--sidebar-bg);
+            color: #ffffff;
+            padding-top: 20px;
+            flex-shrink: 0;
+            border-right: 1px solid #141c25;
+        }
+        .nav-item {
+            padding: 14px 20px;
+            cursor: pointer;
+            transition: background-color 0.15s;
+            font-weight: 500;
+            font-size: 0.9rem;
+            letter-spacing: 0.5px;
+        }
+        .nav-item:hover { background: #334155; }
+        .nav-item.active {
+            background: var(--primary-color);
+            border-left: 4px solid #f97316;
+            padding-left: 16px;
+        }
+        .dashboard-content { flex-grow: 1; padding: 25px 30px; }
+
+        /* --- Page View Management --- */
+        .page-view { display: none; }
+        .page-view.active { display: block; }
+
+        /* --- Widget and Card Styling --- */
+        .widget, .section-card {
+            background: var(--card-background);
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-subtle);
+            padding: 25px;
+            margin-bottom: 25px;
+        }
+
+        /* --- Section Headers --- */
+        h2 { 
+            font-size: 1.5rem; 
+            font-weight: 700; 
+            color: var(--text-color-dark); 
+            margin-bottom: 15px; 
+        }
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-color-dark);
+            margin-bottom: 15px;
+        }
+        
+        /* NEW: Style for main widget titles on Dashboard */
+        #dashboard-view .widget > h3,
+        #dashboard-view .widget > header > h3,
+        #dashboard-view .section-card > header.muster-header > h2 {
+            font-size: 1.25rem; /* Consistent size */
+            font-weight: 600; /* Slightly less bold, more refined */
+            color: var(--primary-color); /* Use brand color */
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color); /* Subtle underline */
+            margin-bottom: 20px;
+        }
+
+        /* Adjust Muster Roll h2 margin since it's in a flex container */
+        #dashboard-view .section-card > header.muster-header > h2 {
+            margin-bottom: 0;
+        }
+        
+        .page-header {
+            display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; /* Changed align-items */
+        }
+        
+        /* NEW: Subtitle for page headers */
+        .page-subtitle {
+            font-size: 0.95rem;
+            color: var(--text-color-muted);
+            margin-top: 4px;
+        }
+        
+        /* Original employee-group-title style (for other pages) */
+        .employee-group-title {
+            margin-top: 30px; margin-bottom: 10px; font-size: 1.15rem; font-weight: 700; color: var(--text-color-dark);
+        }
+
+        /* NEW: Style for sub-headers (FT/AH) on Dashboard page only */
+        #dashboard-view .employee-group-title {
+            margin-top: 30px; 
+            margin-bottom: 15px; /* More space below */
+            font-size: 1.1rem; 
+            font-weight: 600;
+            color: var(--text-color-dark);
+            padding: 6px 12px; /* Add some padding */
+            background-color: var(--primary-light); /* Light bg color */
+            border-left: 4px solid var(--primary-color); /* Accent border */
+            border-radius: 0 4px 4px 0; /* Rounded right corners */
+        }
+
+        /* --- Buttons --- */
+        .btn-action, .btn-detailed, .view-toggle-btn {
+            padding: 8px 12px; border-radius: 6px; cursor: pointer; border: 1px solid var(--border-color);
+            font-weight: 500; transition: background-color 0.2s, border-color 0.2s;
+            font-size: 0.9rem;
+            background-color: #fcfcfc;
+            color: var(--text-color-dark);
+        }
+        .btn-detailed, .muster-actions .btn-action:last-child, .apply-filters-btn {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            font-weight: 600;
+        }
+        .btn-detailed:hover, .btn-action:hover, .apply-filters-btn:hover { opacity: 0.9; }
+
+        /* NEW: Make page titles bigger and use brand color */
+        .page-header h2, .report-header h2 {
+            font-size: 1.75rem; /* Make it bigger */
+            font-weight: 700;
+            color: var(--primary-color); /* Use brand color */
+            margin-bottom: 0; /* Handled by flex */
+        }
+        
+        .view-toggle-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* --- NEW: Re-usable Widget Header Layout --- */
+        .widget-header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+            gap: 15px; /* Add gap for when it wraps */
+        }
+        
+        .widget-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap; /* Allow wrapping on small screens */
+            justify-content: flex-end;
+            flex-grow: 1; /* Allow controls to take space if title is short */
+        }
+        
+        /* NEW: Inline filter group for headers */
+        .filter-group-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .filter-group-inline label {
+            font-size: 0.85rem;
+            color: var(--text-color-muted);
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        
+        .filter-group-inline input[type="month"],
+        .filter-group-inline select,
+        .attendance-summary .widget-controls select { /* Target old select */
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: var(--text-color-dark);
+            background-color: white;
+            height: 38px; /* Standardize height */
+            width: auto; /* Allow natural width */
+            min-width: 150px; /* Give it some space */
+        }
+
+        /* --- Remove old dashboard filter bar style --- */
+        .dashboard-filter-bar {
+           /* This class is no longer used for layout */
+           /* It has been removed from the HTML */
+        }
+        .dashboard-filter-bar .filter-group {
+             /* No longer needed */
+        }
+        .dashboard-filter-bar label {
+             /* No longer needed */
+        }
+        .dashboard-filter-bar input[type="month"],
+        .dashboard-filter-bar select {
+             /* No longer needed */
+        }
+        
+        /* --- DASHBOARD SPECIFIC STYLES (Restored) --- */
+        .top-overview-section {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+        @media (max-width: 1024px) {
+            .top-overview-section { grid-template-columns: 1fr; }
+        }
+
+        .things-to-do ul { list-style: none; }
+        .things-to-do li {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+        }
+        .things-to-do li:last-child { border-bottom: none; }
+        .things-to-do-details .text { font-weight: 600; }
+
+        .attendance-summary header {
+            /* This class is now .widget-header-row */
+            /* We can remove styles here */
+            /* display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; */
+        }
+        /* Style for the select in the Daily Overview header */
+        .attendance-summary .header-actions {
+            /* This class is now .widget-controls */
+            /* We can remove styles here */
+            /* display: flex; align-items: center; gap: 15px; */
+        }
+        
+        .attendance-summary .header-actions select {
+            /* Handled by .filter-group-inline select */
+            /* padding: 8px 10px; ... */
+        }
+        
+        .metrics-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;
+        }
+        .metric-card {
+            padding: 20px; border-radius: 6px; text-align: center;
+            background-color: var(--primary-light);
+        }
+        .metric-card .label { font-size: 0.9rem; color: var(--text-color-muted); font-weight: 500; }
+        .metric-card .value { font-size: 2.2rem; font-weight: 800; margin-top: 5px; }
+        .present-color { color: var(--success-color); }
+        .absent-color { color: var(--danger-color); }
+
+        .detail-cards-row {
+            display: flex; gap: 15px;
+        }
+        .detail-card {
+            flex: 1; padding: 10px 15px; border-radius: 6px; background-color: #fcfcfc; border: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+        .detail-card h4 { font-size: 1rem; font-weight: 600; margin-bottom: 5px; color: var(--primary-color); }
+
+        .muster-header {
+            /* This class is now .widget-header-row */
+            /* We can remove flex-direction: column */
+            /* display: flex; flex-direction: column; */
+        }
+        .muster-actions {
+            /* This class is removed, buttons are now in .widget-controls */
+            /* We can remove styles here */
+            /* display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px; */
+        }
+
+        /* Muster Roll Table (Simpler Structure) */
+        .attendance-table {
+            width: 100%; border-collapse: separate; border-spacing: 0;
+            box-shadow: var(--shadow-subtle); border-radius: 8px;
+            overflow: hidden;
+        }
+        .attendance-table th, .attendance-table td {
+            padding: 12px 15px; text-align: left; border-bottom: 1px solid var(--border-color);
+        }
+        .attendance-table th {
+            background-color: var(--primary-light); color: var(--text-color-dark); font-weight: 700;
+            text-transform: uppercase; font-size: 0.8rem;
+        }
+        .attendance-table tbody tr:hover { background-color: #fbfdff; }
+        .staff-name-cell { display: flex; align-items: center; }
+        .btn-view-attendance {
+            background: none; border: none; font-size: 1.2rem; margin-right: 5px; cursor: pointer;
+            transition: transform 0.2s; color: var(--text-color-dark);
+        }
+        .btn-view-attendance.expanded { transform: rotate(90deg); }
+
+        .attendance-detail-row td { padding: 0 !important; border-bottom: none !important; }
+        .daily-view {
+            display: flex; gap: 4px; padding: 15px; background: #f9f9f9; flex-wrap: wrap;
+            border-top: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .daily-view > div {
+            flex: 0 0 55px; height: 55px; border-radius: 4px; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;
+            border: 1px solid var(--border-color);
+        }
+        .daily-view .date { font-size: 0.8rem; font-weight: 700; }
+        .daily-view .present { background-color: #dcfce7; color: var(--success-color); }
+        .daily-view .absent { background-color: #fee2e2; color: var(--danger-color); }
+        .daily-view .half-day { background-color: #fef9c3; color: var(--warning-color); }
+        .daily-view .leave { background-color: #ebf8ff; color: var(--primary-color); }
+        .daily-view .weekend { background-color: #f1f5f9; color: var(--text-color-muted); }
+
+
+        /* --- STAFF DIRECTORY FORM STYLES (Restored) --- */
+        .form-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;
+        }
+        .form-group label {
+            display: block; margin-bottom: 5px; font-weight: 600; color: var(--text-color-dark);
+        }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px; border: 1px solid var(--border-color);
+            border-radius: 6px; font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 2px rgba(32, 65, 121, 0.2);
+        }
+        .form-group.full-width { grid-column: span 2; }
+        .form-actions {
+            margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border-color);
+            display: flex; justify-content: flex-end; gap: 10px;
+        }
+        /* --- General Table Styles (For Staff Directory) --- */
+        .responsive-table-container {
+            overflow-x: auto;
+            width: 100%;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+        .data-table {
+            width: 100%;
+            min-width: 600px;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        .data-table th, .data-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+        .data-table th {
+            background-color: var(--primary-light);
+            color: var(--text-color-dark);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            border-right: none;
+        }
+        .data-table th:last-child { border-right: none; }
+        .data-table td:last-child { border-right: none; }
+
+        /* --- ATTENDANCE REPORT SPECIFIC STYLES (Kept) --- */
+        .report-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .view-toggle-group {
+            display: flex;
+            gap: 10px;
+        }
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .day-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px;
+            text-align: center;
+            font-weight: 700;
+            border-radius: 6px 6px 0 0;
+            font-size: 0.9rem;
+        }
+        .day-box {
+            background: var(--card-background);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.2s;
+            position: relative;
+        }
+        .day-box:hover {
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+            cursor: pointer;
+        }
+        .day-number {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+        .attendance-stat {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            padding: 4px 0;
+            font-weight: 500;
+        }
+        .stat-label { color: var(--text-color-muted); }
+        .stat-value { font-weight: 700; }
+        .stat-value.present { color: var(--success-color); }
+        .stat-value.absent { color: var(--danger-color); }
+        .stat-value.half { color: var(--warning-color); }
+        .weekend-box {
+            background-color: var(--primary-light);
+        }
+        .staff-type-ft { color: var(--primary-color); font-weight: 700; }
+        .staff-type-ah { color: var(--success-color); font-weight: 700; }
+        .selfie-cell { width: 100px; text-align: center; }
+        .time-cell { font-family: monospace; font-size: 1rem; }
+
+        /* Report Filters Styling */
+        .report-filters {
+            grid-template-columns: repeat(5, 1fr); /* 4 inputs + 1 button */
+        }
+        .filter-group label {
+            font-size: 0.75rem;
+            color: var(--text-color-muted);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .filter-group input[type="date"],
+        .filter-group select {
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: var(--text-color-dark);
+            background-color: white;
+            height: 38px; /* Standardize height */
+        }
+        .filter-action-group {
+            display: flex;
+            align-items: flex-end; /* Align button to the bottom of the grid row */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <nav class="sidebar">
+            <div class="nav-item active" id="nav-dashboard">
+                Dashboard
+            </div>
+            <div class="nav-item" id="nav-staff-directory">
+                Staff Directory
+            </div>
+            <!-- NEW TAB FOR ATTENDANCE REPORTS -->
+            <div class="nav-item" id="nav-attendance-report">
+                Attendance Reports
+            </div>
+        </nav>
+
+        <!-- ============================================= -->
+        <!-- ======== DASHBOARD VIEW (RESTORED) ========== -->
+        <!-- ============================================= -->
+        <main class="dashboard-content page-view active" id="dashboard-view">
+            <section class="top-overview-section">
+                <!-- Action Center Widget (Things to Do) -->
+                <div class="widget things-to-do">
+                    <h3>Action Center</h3>
+                    <ul>
+                        <li>
+                            <div class="things-to-do-details">
+                                <span class="text">Unapproved Absences</span>
+                            </div>
+                            <span class="detail" style="color: var(--danger-color); font-weight: 600;">2 Staff Pending</span>
+                            <span class="arrow">></span>
+                        </li>
+                        <li>
+                            <div class="things-to-do-details">
+                                <span class="text">Pending Leave Requests</span>
+                            </div>
+                            <span class="detail">No Requests</span>
+                            <span class="arrow">></span>
+                        </li>
+                        <li>
+                            <div class="things-to-do-details">
+                                <span class="text">Late Punch-In Today</span>
+                            </div>
+                            <span class="detail">3 Employees</span>
+                            <span class="arrow">></span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Attendance Summary Widget -->
+                <div class="widget attendance-summary">
+                    <header class="widget-header-row">
+                        <h3>Daily Attendance Overview</h3>
+                        <div class="widget-controls">
+                            <span class="date-filter clickable" id="date-filter-top">
+                                📅 November 01, 2025
+                            </span>
+                            <!-- NEW: Wrapped in filter-group-inline -->
+                            <div class="filter-group-inline">
+                                <label for="dash-filter-location-daily">Location</label>
+                                <select id="dash-filter-location-daily">
+                                    <option value="">All Locations</option>
+                                </select>
+                            </div>
+                            <button class="btn-detailed">
+                                View Full Report
+                            </button>
+                        </div>
+                    </header>
+
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="label">Total Present</div>
+                            <div class="value present-color">25</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="label">Total Absent</div>
+                            <div class="value absent-color">3</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="label">Total Staff Base</div>
+                            <div class="value" style="color: var(--primary-color);">30</div>
+                        </div>
+                    </div>
+
+                    <div class="detail-cards-row">
+                        <div class="detail-card on-leave">
+                            <h4>Staff on Leave</h4>
+                            <p>Planned Leave: 2 (PL/SL)</p>
+                        </div>
+                        <div class="detail-card overtimes">
+                            <h4>Overtime Budget</h4>
+                            <p>This Week's Projection: 5h 30m</p>
+                        </div>
+                        <div class="detail-card other-details">
+                            <h4>Compliance Status</h4>
+                            <p>All compliance checks passed.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Muster Roll Section -->
+            <section class="section-card muster-roll-section">
+                <header class="widget-header-row muster-header">
+                    <h2>Muster Roll (Monthly)</h2>
+                    
+                    <!-- NEW: Combined controls and filter bar -->
+                    <div class="widget-controls">
+                        <div class="filter-group-inline">
+                            <label for="dash-filter-month">Month</label>
+                            <input type="month" id="dash-filter-month" value="2025-11" style="min-width: 140px;"> <!-- Inline style for small override -->
+                        </div>
+                        <div class="filter-group-inline">
+                            <label for="dash-filter-location-muster">Location</label>
+                            <select id="dash-filter-location-muster">
+                                <option value="">All Locations</option>
+                            </select>
+                        </div>
+                        
+                        <button class="btn-action" id="expand-all-btn">
+                            Expand All
+                        </button>
+                        <button class="btn-detailed">
+                            Download Data
+                        </button>
+                    </div>
+                </header>
+
+                <div class="attendance-table-container">
+                    <h3 class="employee-group-title">Full Time Employees (FT)</h3>
+                    <table class="attendance-table">
+                        <thead>
+                            <tr>
+                                <th>Staff ID / Name</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Half Day</th>
+                                <th>Paid Leave</th>
+                                <th>Unmarked</th>
+                                <th>Overtime (h)</th>
+                                <th>Fine/Deduction (h)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Mock FT Data -->
+                            <tr class="staff-row">
+                                <td data-label="Staff ID" class="staff-name-cell">
+                                    <button class="btn-view-attendance" data-target="detail-1">▶</button>
+                                    <span class="staff-name-text">JD001 (John Doe)</span>
+                                </td>
+                                <td>20</td>
+                                <td style="color: var(--danger-color); font-weight: 700;">2</td>
+                                <td>1</td>
+                                <td>3</td>
+                                <td>0</td>
+                                <td>5.5</td>
+                                <td>0</td>
+                            </tr>
+                            <tr class="attendance-detail-row hidden" id="detail-1-row">
+                                <td colspan="8">
+                                    <div class="daily-view" id="daily-view-1">
+                                        <!-- Content generated by JS -->
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="staff-row">
+                                <td data-label="Staff ID" class="staff-name-cell">
+                                    <button class="btn-view-attendance" data-target="detail-3">▶</button>
+                                    <span class="staff-name-text">AS002 (Alice Smith)</span>
+                                </td>
+                                <td style="color: var(--success-color); font-weight: 700;">22</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0.0</td>
+                                <td>0</td>
+                            </tr>
+                            <tr class="attendance-detail-row hidden" id="detail-3-row">
+                                <td colspan="8">
+                                    <div class="daily-view" id="daily-view-3">
+                                        <!-- Content generated by JS -->
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h3 class="employee-group-title">Adhoc Contractors (AH)</h3>
+                    <table class="attendance-table">
+                        <thead>
+                             <tr>
+                                <th>Staff ID / Name</th>
+                                <th>Present</th>
+                                <th>Absent</th>
+                                <th>Half Day</th>
+                                <th>Paid Leave</th>
+                                <th>Unmarked</th>
+                                <th>Overtime (h)</th>
+                                <th>Fine/Deduction (h)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Mock AH Data -->
+                            <tr class="staff-row">
+                                <td data-label="Staff ID" class="staff-name-cell">
+                                    <button class="btn-view-attendance" data-target="detail-2">▶</button>
+                                    <span class="staff-name-text">C001 (Contractor 1)</span>
+                                </td>
+                                <td>10</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                                <td>0</td>
+                            </tr>
+                            <tr class="attendance-detail-row hidden" id="detail-2-row">
+                                <td colspan="8">
+                                    <div class="daily-view" id="daily-view-2">
+                                        <!-- Content generated by JS -->
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </main>
+
+        <!-- ============================================= -->
+        <!-- ====== STAFF DIRECTORY VIEW (RESTORED) ====== -->
+        <!-- ============================================= -->
+        <main class="dashboard-content page-view" id="staff-directory-view">
+            <section class="section-card">
+                <header class="page-header">
+                    <div> <!-- Wrapper for title and subtitle -->
+                        <h2>Staff Directory</h2>
+                        <p class="page-subtitle">Add, view, or manage your staff records.</p>
+                    </div>
+                    <button class="btn-detailed" id="show-add-staff-form">
+                        + Add New Staff
+                    </button>
+                </header>
+
+                <!-- NEW FILTER BAR -->
+                <div class="report-filters mb-6 grid grid-cols-3 gap-4">
+                    <div class="filter-group col-span-2"> <!-- Make wider -->
+                        <label for="filter-staff-location" class="block">Farm Location</label>
+                        <select id="filter-staff-location" class="w-full"></select>
+                    </div>
+                    <div class="filter-group col-span-1">
+                        <!-- Placeholder for potential future filters like search -->
+                    </div>
+                    <!-- Removed the filter-action-group -->
+                </div>
+
+                <h3 class="employee-group-title">Full Time Employees (FT)</h3>
+                <div class="responsive-table-container mb-8"> <!-- Added margin-bottom and moved container here -->
+                    <table class="data-table" id="ft-staff-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Phone No</th>
+                                <th>Farm Location</th>
+                                <th>Staff ID</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ft-staff-table-body">
+                            <tr>
+                                <td>John Doe</td>
+                                <td>+91 98765 43210</td>
+                                <td>South Delhi Farm</td>
+                                <td>JD001</td>
+                            </tr>
+                             <tr>
+                                <td>Alice Smith</td>
+                                <td>+91 98765 43211</td>
+                                <td>South Delhi Farm</td>
+                                <td>AS002</td>
+                            </tr>
+                             <tr>
+                                <td>Rajesh D.</td>
+                                <td>+91 98765 33333</td>
+                                <td>West Delhi Farm</td>
+                                <td>RD003</td>
+                            </tr>
+                             <tr>
+                                <td>Priya K.</td>
+                                <td>+91 98765 55555</td>
+                                <td>Gurgaon Farm</td>
+                                <td>PK005</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div> <!-- END container for FT -->
+
+                <h3 class="employee-group-title">Adhoc Contractors (AH)</h3>
+                <div class="responsive-table-container"> <!-- NEW container for AH -->
+                    <table class="data-table" id="ah-staff-table">
+                         <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Phone No</th>
+                                <th>Farm Location</th>
+                                <th>Staff ID</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ah-staff-table-body">
+                             <tr>
+                                <td>Contractor 1</td>
+                                <td>+91 98765 11111</td>
+                                <td>Gurgaon Farm</td>
+                                <td>C001</td>
+                            </tr>
+                             <tr>
+                                <td>Contractor 2</td>
+                                <td>+91 98765 22222</td>
+                                <td>South Delhi Farm</td>
+                                <td>C002</td>
+                            </tr>
+                             <tr>
+                                <td>Sameer K.</td>
+                                <td>+91 98765 44444</td>
+                                <td>Noida Farm</td>
+                                <td>SK004</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div> <!-- END container for AH -->
+            </section>
+        </main>
+
+        <!-- ============================================= -->
+        <!-- ========= ADD NEW STAFF VIEW (KEEP) ========= -->
+        <!-- ============================================= -->
+        <main class="dashboard-content page-view" id="add-staff-view">
+            <section class="section-card">
+                <header class="page-header">
+                    <h2>Add New Staff Member</h2>
+                </header>
+
+                <div class="form-container">
+                    <form id="add-staff-form">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="staff-name">Full Name</label>
+                                <input type="text" id="staff-name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="staff-phone">Phone No</label>
+                                <input type="tel" id="staff-phone" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="staff-employment-type">Employment Type</label>
+                                <select id="staff-employment-type" required>
+                                    <option value="">-- Select Type --</option>
+                                    <option value="ft">Full Time Employee</option>
+                                    <option value="ah">Adhoc Contractor</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="staff-aadhaar">Aadhaar Number</label>
+                                <input type="text" id="staff-aadhaar" pattern="\d{12}" title="Must be 12 digits">
+                            </div>
+                            <div class="form-group">
+                                <label for="staff-work-location">Work Location</label>
+                                <input type="text" id="staff-work-location">
+                            </div>
+                            <div class="form-group">
+                                <label for="staff-farm-location">Farm Location</label>
+                                <input type="text" id="staff-farm-location">
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="staff-address">Address</label>
+                                <textarea id="staff-address"></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="staff-selfie">Selfie Upload</label>
+                                <input type="file" id="staff-selfie" accept="image/*">
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                             <button type="submit" class="btn-detailed">Save Staff</button>
+                             <button type="button" class="btn-action" id="cancel-add-staff">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+
+        <!-- ============================================= -->
+        <!-- ======= ATTENDANCE REPORT VIEW (NEW) ======== -->
+        <!-- ============================================= -->
+        <main class="dashboard-content page-view" id="attendance-report-view">
+            <section class="section-card">
+                <header class="report-header">
+                    <h2>Overall Attendance Report</h2>
+                    <div class="view-toggle-group">
+                        <button class="view-toggle-btn active" id="view-toggle-month">
+                            Monthly Summary
+                        </button>
+                        <button class="view-toggle-btn" id="view-toggle-individual">
+                            Individual Daily Log
+                        </button>
+                    </div>
+                </header>
+
+                <!-- New Filter Bar -->
+                <div class="report-filters mb-6 grid grid-cols-3 gap-4">
+                    <div class="filter-group">
+                        <label for="filter-location" class="block">Farm Location</label>
+                        <select id="filter-location" class="w-full"></select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-date-from" class="block">Date</label>
+                        <input type="date" id="filter-date-from" class="w-full" value="2025-11-01">
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-employee" class="block">Employee Name</label>
+                        <select id="filter-employee" class="w-full"></select>
+                    </div>
+                </div>
+
+                <!-- Month View (Calendar) -->
+                <div id="month-view-content">
+                    <div id="calendar-view-container">
+                        <!-- Day Headers -->
+                        <div class="calendar-grid">
+                            <div class="day-header">SUN</div>
+                            <div class="day-header">MON</div>
+                            <div class="day-header">TUE</div>
+                            <div class="day-header">WED</div>
+                            <div class="day-header">THU</div>
+                            <div class="day-header">FRI</div>
+                            <div class="day-header weekend-box">SAT</div>
+                        </div>
+                        <!-- Calendar Days will be rendered here by JS -->
+                        <div class="calendar-grid" id="calendar-days-container">
+                            <!-- JS Generated Days -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Individual View (Daily Log Table) -->
+                <div id="individual-view-content" class="hidden">
+                    <!-- Note: The date filter range is not applicable here, only a single day is relevant. -->
+
+                    <!-- Full Time Log Section -->
+                    <h3 class="employee-group-title">Full Time Employees (FT) Log</h3>
+                    <div class="responsive-table-container mb-8">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Staff ID / Name</th>
+                                    <th class="selfie-cell">Selfie Proof</th>
+                                    <th>Attendance Status</th>
+                                    <th>Location</th>
+                                    <th>Punch In Time</th>
+                                    <th>Punch Out Time</th>
+                                    <th>Total Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="individual-log-table-body-ft">
+                                <!-- FT Data populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Adhoc Log Section -->
+                    <h3 class="employee-group-title">Adhoc Contractors (AH) Log</h3>
+                    <div class="responsive-table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Staff ID / Name</th>
+                                    <th class="selfie-cell">Selfie Proof</th>
+                                    <th>Attendance Status</th>
+                                    <th>Location</th>
+                                    <th>Punch In Time</th>
+                                    <th>Punch Out Time</th>
+                                    <th>Total Duration</th>
+                                </tr>
+                            </thead>
+                            <tbody id="individual-log-table-body-ah">
+                                <!-- AH Data populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+    </div>
+
+    <script>
+        // --- MOCK DATA STRUCTURES ---
+
+        // Mock staff data with location and type
+        const staffData = {
+            'JD001': { name: 'John Doe', type: 'FT', location: 'South Delhi Farm', phone: '+91 98765 43210' },
+            'AS002': { name: 'Alice Smith', type: 'FT', location: 'South Delhi Farm', phone: '+91 98765 43211' },
+            'RD003': { name: 'Rajesh D.', type: 'FT', location: 'West Delhi Farm', phone: '+91 98765 33333' },
+            'PK005': { name: 'Priya K.', type: 'FT', location: 'Gurgaon Farm', phone: '+91 98765 55555' },
+            'C001': { name: 'Contractor 1', type: 'AH', location: 'Gurgaon Farm', phone: '+91 98765 11111' },
+            'C002': { name: 'Contractor 2', type: 'AH', location: 'South Delhi Farm', phone: '+91 98765 22222' },
+            'SK004': { name: 'Sameer K.', type: 'AH', location: 'Noida Farm', phone: '+91 98765 44444' },
+        };
+        
+        // Mock data for Muster Roll (30 days of November)
+        const mockAttendanceRoll = {
+            'JD001': ['P', 'A', 'P', 'P', 'H', 'P', 'P', 'W', 'W', 'P', 'P', 'L', 'P', 'A', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'H', 'P', 'P', 'P', 'W', 'W', 'P', 'P'],
+            'AS002': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P'],
+            'RD003': ['P', 'P', 'P', 'L', 'P', 'P', 'P', 'W', 'W', 'P', 'A', 'P', 'P', 'P', 'H', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P'],
+            'PK005': ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P'],
+            'C001':  ['P', 'P', 'A', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            'C002':  ['P', 'A', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+            'SK004': ['P', 'P', 'P', 'P', 'P', 'P', 'A', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P', 'P', 'P', 'P', 'P', 'P', 'W', 'W', 'P', 'P']
+        };
+
+        // Mock data for INDIVIDUAL DAILY LOG (for a specific day, e.g., Nov 1st)
+        const mockDailyLog = [
+            { id: 'JD001', checkIn: '09:02 AM', checkOut: '05:30 PM', duration: '8h 28m', location: 'South Delhi Farm', status: 'P' },
+            { id: 'AS002', checkIn: '09:00 AM', checkOut: '06:00 PM', duration: '9h 00m', location: 'South Delhi Farm', status: 'P' },
+            { id: 'RD003', checkIn: '08:55 AM', checkOut: '05:40 PM', duration: '8h 45m', location: 'West Delhi Farm', status: 'P' },
+            { id: 'PK005', checkIn: '09:00 AM', checkOut: '1:00 PM', duration: '4h 00m', location: 'Gurgaon Farm', status: 'H' },
+            { id: 'C001', checkIn: '09:30 AM', checkOut: '05:00 PM', duration: '7h 30m', location: 'Gurgaon Farm', status: 'P' },
+            { id: 'C002', checkIn: null, checkOut: null, duration: '0h 0m', location: 'N/A', status: 'A' },
+            { id: 'SK004', checkIn: '09:15 AM', checkOut: '05:15 PM', duration: '8h 00m', location: 'Noida Farm', status: 'P' }
+        ];
+
+        // --- CORE APPLICATION LOGIC ---
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Navigation Elements ---
+            const navDashboard = document.getElementById('nav-dashboard');
+            const navStaffDirectory = document.getElementById('nav-staff-directory');
+            const navAttendanceReport = document.getElementById('nav-attendance-report');
+            const allNavItems = document.querySelectorAll('.nav-item');
+
+            const dashboardView = document.getElementById('dashboard-view');
+            const staffDirectoryView = document.getElementById('staff-directory-view');
+            const addStaffView = document.getElementById('add-staff-view');
+            const attendanceReportView = document.getElementById('attendance-report-view');
+            const allPageViews = document.querySelectorAll('.page-view');
+
+            // --- Attendance Report Sub-Views ---
+            const monthViewContent = document.getElementById('month-view-content');
+            const individualViewContent = document.getElementById('individual-view-content');
+            const toggleMonthBtn = document.getElementById('view-toggle-month');
+            const toggleIndividualBtn = document.getElementById('view-toggle-individual');
+            
+            const calendarDaysContainer = document.getElementById('calendar-days-container');
+            
+            // New table body references for grouping
+            const individualLogTableBodyFt = document.getElementById('individual-log-table-body-ft');
+            const individualLogTableBodyAh = document.getElementById('individual-log-table-body-ah');
+            
+            // Filter elements
+            const filterLocation = document.getElementById('filter-location');
+            const filterEmployee = document.getElementById('filter-employee');
+            const filterDateFrom = document.getElementById('filter-date-from'); // Get the date input
+            // const applyFiltersBtn = document.querySelector('.apply-filters-btn'); // Button is removed
+            
+            // NEW: Staff Directory Filter Elements
+            const filterStaffLocation = document.getElementById('filter-staff-location');
+            // const applyStaffFiltersBtn = document.getElementById('apply-staff-filters'); // Button is removed
+            
+            // NEW Dashboard Filter Elements
+            const dashFilterLocationDaily = document.getElementById('dash-filter-location-daily');
+            const dashFilterLocationMuster = document.getElementById('dash-filter-location-muster');
+            const dashFilterMonthMuster = document.getElementById('dash-filter-month');
+
+
+            // --- Function to switch main views ---
+            function setActiveView(activeView, activeNav) {
+                // Hide all views
+                allPageViews.forEach(view => view.classList.remove('active'));
+                // Deactivate all nav items
+                allNavItems.forEach(nav => nav.classList.remove('active'));
+
+                // Show the active view
+                if (activeView) activeView.classList.add('active');
+                // Highlight the active nav item
+                if (activeNav) activeNav.classList.add('active');
+            }
+
+            // --- Function to switch sub-views within Attendance Report ---
+            function setReportSubView(viewType) {
+                // Deactivate all toggle buttons
+                toggleMonthBtn.classList.remove('active');
+                toggleIndividualBtn.classList.remove('active');
+
+                // Toggle visibility
+                if (viewType === 'month') {
+                    monthViewContent.classList.remove('hidden');
+                    individualViewContent.classList.add('hidden');
+                    toggleMonthBtn.classList.add('active');
+                    // Note: Date range filter is primarily used for this view
+                } else { // 'individual'
+                    monthViewContent.classList.add('hidden');
+                    individualViewContent.classList.remove('hidden');
+                    toggleIndividualBtn.classList.add('active');
+                    // Note: For this view, only the 'Date From' filter should be considered 
+                    // as it represents a single day's log. The 'Date To' is redundant.
+                }
+            }
+
+
+            // --- NAVIGATION EVENT LISTENERS ---
+            navDashboard.addEventListener('click', () => { setActiveView(dashboardView, navDashboard); });
+            navStaffDirectory.addEventListener('click', () => { 
+                setActiveView(staffDirectoryView, navStaffDirectory); 
+                // Re-run filter every time view is shown to reset it
+                const currentLocationFilter = document.getElementById('filter-staff-location').value;
+                filterStaffDirectoryTables(currentLocationFilter);
+            });
+            navAttendanceReport.addEventListener('click', () => {
+                setActiveView(attendanceReportView, navAttendanceReport);
+                // Ensure month view is the default when switching to the reports tab
+                setReportSubView('month');
+                renderMonthViewCalendar();
+                renderIndividualLogTable(mockDailyLog);
+                populateFilters();
+            });
+
+            // --- REPORT SUB-VIEW TOGGLE LISTENERS ---
+            toggleMonthBtn.addEventListener('click', () => setReportSubView('month'));
+            toggleIndividualBtn.addEventListener('click', () => setReportSubView('individual'));
+            
+            // --- FILTER LOGIC ---
+            function populateFilters() {
+                // 1. Farm Location
+                const locations = new Set();
+                Object.values(staffData).forEach(staff => locations.add(staff.location));
+                
+                let locationOptionsHTML = '<option value="">All Locations</option>';
+                locations.forEach(loc => {
+                    locationOptionsHTML += `<option value="${loc}">${loc}</option>`;
+                });
+                
+                // Populate all three location filters
+                filterLocation.innerHTML = locationOptionsHTML;
+                if (dashFilterLocationDaily) dashFilterLocationDaily.innerHTML = locationOptionsHTML;
+                if (dashFilterLocationMuster) dashFilterLocationMuster.innerHTML = locationOptionsHTML;
+                if (filterStaffLocation) filterStaffLocation.innerHTML = locationOptionsHTML; // ADDED
+
+                // 2. Employee Name
+                const employees = Object.entries(staffData).map(([id, data]) => ({ id, name: data.name })).sort((a, b) => a.name.localeCompare(b.name));
+                filterEmployee.innerHTML = '<option value="">All Employees</option>';
+                employees.forEach(staff => {
+                    filterEmployee.innerHTML += `<option value="${staff.id}">${staff.name} (${staff.id})</option>`;
+                });
+            }
+            
+            // Mock filter application
+            /*
+            if (applyFiltersBtn) {
+                applyFiltersBtn.addEventListener('click', () => {
+                    const location = filterLocation.value;
+                    const employee = filterEmployee.value;
+                    const dateFrom = document.getElementById('filter-date-from').value;
+                    const dateTo = document.getElementById('filter-date-to').value;
+                    
+                    console.log('Applying Filters:', { location, employee, dateFrom, dateTo });
+                    
+                    // In a real application, this would trigger an API call or re-render with filtered data.
+                    // If Individual Log view is active, the date range is ignored and only dateFrom is relevant.
+                    renderMonthViewCalendar();
+                    renderIndividualLogTable(mockDailyLog);
+                    
+                    // Show confirmation message (using console as per instruction)
+                    console.log(`Filters applied: Location=${location || 'All'}, Employee=${employee || 'All'}, Date Range=${dateFrom} to ${dateTo}`);
+                });
+            }
+            */
+
+            // Function to apply filters on the Attendance Report page
+            function applyReportFilters() {
+                if (!filterLocation || !filterEmployee || !filterDateFrom) return; // Guard clause
+
+                const location = filterLocation.value;
+                const employee = filterEmployee.value;
+                const date = filterDateFrom.value; // Get single date
+                
+                console.log('Applying Filters:', { location, employee, date });
+                
+                // In a real application, this would trigger an API call or re-render with filtered data.
+                // Per user request, the title H2 remains static.
+
+                renderMonthViewCalendar(); // This function doesn't use filters yet, but it's fine
+                renderIndividualLogTable(mockDailyLog); // This function doesn't use filters yet, but it's fine
+                
+                console.log(`Filters applied: Location=${location || 'All'}, Employee=${employee || 'All'}, Date=${date}`);
+            }
+
+            // NEW: Add event listeners for auto-apply on report filters
+            if (filterLocation) {
+                filterLocation.addEventListener('change', applyReportFilters);
+            }
+            if (filterEmployee) {
+                filterEmployee.addEventListener('change', applyReportFilters);
+            }
+            if (filterDateFrom) {
+                filterDateFrom.addEventListener('change', applyReportFilters);
+            }
+            
+            // NEW: Listener for Staff Directory Filter
+            /*
+            if (applyStaffFiltersBtn) {
+                applyStaffFiltersBtn.addEventListener('click', () => {
+                    const location = filterStaffLocation.value;
+                    console.log(`Applying Staff Directory Filters: Location=${location || 'All'}`);
+                    
+                    // Call a new function to filter the staff tables
+                    filterStaffDirectoryTables(location);
+                });
+            }
+            */
+
+            // NEW: Add event listener for auto-apply on staff directory filter
+            if (filterStaffLocation) {
+                filterStaffLocation.addEventListener('change', () => {
+                    const location = filterStaffLocation.value;
+                    console.log(`Applying Staff Directory Filters: Location=${location || 'All'}`);
+                    filterStaffDirectoryTables(location);
+                });
+            }
+            
+            // NEW: Mock Listeners for Dashboard Filters
+            if (dashFilterLocationDaily) {
+                dashFilterLocationDaily.addEventListener('change', (e) => {
+                    console.log(`Dashboard Daily Overview: Location filter changed to ${e.target.value || 'All'}`);
+                    // In a real app, this would refetch data for the "Daily Attendance Overview" widget
+                });
+            }
+            
+            if (dashFilterLocationMuster || dashFilterMonthMuster) {
+                const applyMusterFilters = () => {
+                    const location = dashFilterLocationMuster ? dashFilterLocationMuster.value : '';
+                    const month = dashFilterMonthMuster ? dashFilterMonthMuster.value : '';
+                    console.log(`Dashboard Muster Roll: Filters changed. Location=${location || 'All'}, Month=${month}`);
+                    // In a real app, this would refetch data for the "Muster Roll" widget
+                };
+                
+                if (dashFilterLocationMuster) dashFilterLocationMuster.addEventListener('change', applyMusterFilters);
+                if (dashFilterMonthMuster) dashFilterMonthMuster.addEventListener('change', applyMusterFilters);
+            }
+            
+            // --- ATTENDANCE REPORT VIEW GENERATION LOGIC ---
+            
+            // Helper to map status codes to text and color class
+            function getStatusDisplay(status) {
+                let text = 'Unmarked';
+                let colorClass = 'text-gray-500'; 
+
+                switch (status) {
+                    case 'P':
+                        text = 'Present';
+                        colorClass = 'text-green-700 font-semibold';
+                        break;
+                    case 'A':
+                        text = 'Absent';
+                        colorClass = 'text-red-700 font-semibold';
+                        break;
+                    case 'H':
+                        text = 'Half Day';
+                        colorClass = 'text-yellow-700 font-semibold';
+                        break;
+                    case 'L':
+                        text = 'On Leave';
+                        colorClass = 'text-blue-700 font-semibold';
+                        break;
+                }
+                return { text, colorClass };
+            }
+
+            // Helper function to calculate aggregate attendance for all staff on a given day
+            function getDailyAggregates(dayIndex) {
+                let present = 0;
+                let absent = 0;
+                let halfDay = 0;
+                const totalStaff = Object.keys(staffData).length;
+
+                for (const staffId in mockAttendanceRoll) {
+                    const status = mockAttendanceRoll[staffId][dayIndex];
+                    if (status === 'P') present++;
+                    if (status === 'A') absent++;
+                    if (status === 'H') halfDay++;
+                    if (status === 'L') absent++; // Treat planned leave as a form of absence for the daily count
+                }
+                
+                // Unaccounted (e.g., weekend/holiday)
+                const accounted = present + absent + halfDay;
+                const unaccounted = totalStaff - accounted;
+                
+                // If all staff are unaccounted for (W), assume it's a weekend and reset counts for a cleaner look
+                if (unaccounted === totalStaff) {
+                    return { present: 0, absent: 0, halfDay: 0, isWeekend: true };
+                }
+
+                return { present, absent, halfDay, isWeekend: false };
+            }
+
+            // 1. Month View (Calendar) Renderer
+            function renderMonthViewCalendar() {
+                // November 2025: Nov 1st is a Saturday. 
+                const totalDays = 30; 
+                const startingDayOffset = 5; // Sun (0) to Fri (5). Sat is day 6. Nov 1st is a Saturday. So we need 5 empty boxes before.
+                let html = '';
+
+                // Add empty placeholders for days before the 1st
+                for (let i = 0; i < startingDayOffset; i++) {
+                    // The first day is Saturday, so we start with 5 empty days (Sun to Fri)
+                    html += '<div class="day-box disabled"></div>';
+                }
+
+                for (let day = 1; day <= totalDays; day++) {
+                    const dayIndex = day - 1; 
+                    const aggregates = getDailyAggregates(dayIndex);
+                    
+                    // dayOfWeek: 0 (Sun) to 6 (Sat)
+                    // Since Nov 1 is Saturday (6), the pattern is (dayIndex + 6) % 7 
+                    const dayOfWeek = (dayIndex + 6) % 7; 
+                    const isWeekend = dayOfWeek === 6 || dayOfWeek === 0; 
+                    const weekendClass = isWeekend ? 'weekend-box' : '';
+                    
+                    html += `
+                        <div class="day-box ${weekendClass}" data-day="${day}">
+                            <div class="day-number">${day}</div>
+                            <div class="attendance-stat">
+                                <span class="stat-label">Present:</span>
+                                <span class="stat-value present">${aggregates.present}</span>
+                            </div>
+                            <div class="attendance-stat">
+                                <span class="stat-label">Absent:</span>
+                                <span class="stat-value absent">${aggregates.absent}</span>
+                            </div>
+                            <div class="attendance-stat">
+                                <span class="stat-label">Half Day:</span>
+                                <span class="stat-value half">${aggregates.halfDay}</span>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                calendarDaysContainer.innerHTML = html;
+            }
+            
+            // 2. Individual View (Detailed Log) Renderer - UPDATED FOR USER REQUESTS
+            function renderIndividualLogTable(dailyLog) {
+                let ftHtml = '';
+                let ahHtml = '';
+                
+                const ftLogs = dailyLog.filter(log => staffData[log.id] && staffData[log.id].type === 'FT');
+                const ahLogs = dailyLog.filter(log => staffData[log.id] && staffData[log.id].type === 'AH');
+
+                const renderRow = (log) => {
+                    const employee = staffData[log.id];
+                    if (!employee) return ''; 
+
+                    const staffTypeText = employee.type === 'FT' ? 'FT' : 'AH';
+                    const staffTypeClass = employee.type === 'FT' ? 'staff-type-ft' : 'staff-type-ah';
+                    const statusInfo = getStatusDisplay(log.status);
+
+                    // Highlight row based on status (same as before)
+                    const statusClass = log.status === 'A' ? 'bg-red-50' : (log.status === 'H' ? 'bg-yellow-50' : '');
+                    
+                    // Determine if View button should be disabled (e.g., if absent)
+                    const isProofAvailable = log.status === 'P' || log.status === 'H';
+                    const viewBtnDisabled = isProofAvailable ? '' : 'disabled';
+                    const viewBtnColor = isProofAvailable ? 'var(--primary-color)' : 'var(--text-color-muted)';
+
+
+                    return `
+                        <tr class="${statusClass}">
+                            <td>
+                                <div>${employee.name} (${log.id})</div>
+                                <span class="${staffTypeClass} text-xs uppercase">${staffTypeText} Staff</span>
+                            </td>
+                            <td class="selfie-cell">
+                                <button class="btn-detailed !p-2 !text-sm" style="background-color: ${viewBtnColor}; color: white; border: none;" ${viewBtnDisabled} onclick="console.log('Viewing selfie proof for ${log.id}');">View</button>
+                            </td>
+                            <td class="${statusInfo.colorClass}">
+                                ${statusInfo.text}
+                            </td>
+                            <td>${log.location}</td>
+                            <td class="time-cell ${log.status === 'A' || log.status === 'L' ? 'text-gray-400' : ''}">${log.checkIn || 'N/A'}</td>
+                            <td class="time-cell ${log.status === 'A' || log.status === 'L' ? 'text-gray-400' : ''}">${log.checkOut || 'N/A'}</td>
+                            <td>${log.duration}</td>
+                        </tr>
+                    `;
+                };
+                
+                ftLogs.forEach(log => { ftHtml += renderRow(log); });
+                ahLogs.forEach(log => { ahHtml += renderRow(log); });
+                
+                individualLogTableBodyFt.innerHTML = ftHtml;
+                individualLogTableBodyAh.innerHTML = ahHtml;
+            }
+
+            // NEW Function: Filter Staff Directory
+            function filterStaffDirectoryTables(location) {
+                const allStaff = Object.entries(staffData);
+                
+                // Filter staff based on location and type
+                const ftStaff = allStaff.filter(([id, data]) => data.type === 'FT' && (!location || data.location === location));
+                const ahStaff = allStaff.filter(([id, data]) => data.type === 'AH' && (!location || data.location === location));
+                
+                const ftBody = document.getElementById('ft-staff-table-body');
+                const ahBody = document.getElementById('ah-staff-table-body');
+                
+                const generateRows = (staffList) => {
+                    return staffList.map(([id, data]) => `
+                        <tr>
+                            <td>${data.name}</td>
+                            <td>${data.phone}</td>
+                            <td>${data.location}</td>
+                            <td>${id}</td>
+                        </tr>
+                    `).join('');
+                };
+                
+                if(ftBody) ftBody.innerHTML = generateRows(ftStaff);
+                if(ahBody) ahBody.innerHTML = generateRows(ahStaff);
+            }
+
+
+            // --- OLDER LOGIC INTEGRATION (Muster Roll Toggles) ---
+            
+            // Function to generate the HTML for the full month (30 days) - used in Muster Roll
+            function generateDailyViewHTML(employeeKey) {
+                const data = mockAttendanceRoll[employeeKey] || [];
+                let html = '';
+                const totalDays = 30;
+
+                for (let day = 1; day <= totalDays; day++) {
+                    const status = data[day - 1] || 'P';
+                    let statusClass = '';
+                    let statusText = '';
+
+                    // Simple logic to set status text/class for Muster Roll mini-calendar
+                    if (status === 'P') { statusClass = 'present'; statusText = 'P'; }
+                    else if (status === 'A') { statusClass = 'absent'; statusText = 'A'; }
+                    else if (status === 'H') { statusClass = 'half-day'; statusText = 'H'; }
+                    else if (status === 'L') { statusClass = 'leave'; statusText = 'L'; }
+                    else if (status === 'W') { statusClass = 'weekend'; statusText = 'W'; }
+                    else { statusClass = 'present'; statusText = 'P'; }
+
+
+                    html += `
+                        <div class="${statusClass}">
+                            <span class="date">${day}</span>
+                            <span class="status">${statusText}</span>
+                        </div>
+                    `;
+                }
+                return html;
+            }
+            
+            // Muster Roll Toggles
+            const initializeMusterRoll = () => {
+                document.querySelectorAll('.btn-view-attendance').forEach(button => {
+                    const staffRow = button.closest('.staff-row');
+                    const employeeKeyElement = staffRow.querySelector('.staff-name-text');
+                    if (employeeKeyElement) {
+                         const employeeKeyMatch = employeeKeyElement.textContent.match(/([A-Z0-9]+)/);
+                         if (employeeKeyMatch) {
+                             const employeeKey = employeeKeyMatch[1];
+                             const detailDivId = button.dataset.target.replace('detail-', 'daily-view-');
+                             const detailDiv = document.getElementById(detailDivId);
+                             if (detailDiv) {
+                                 // Only generate if data exists in the mock (prevents errors)
+                                 if (mockAttendanceRoll[employeeKey]) {
+                                     detailDiv.innerHTML = generateDailyViewHTML(employeeKey);
+                                 } else {
+                                     detailDiv.innerHTML = '<p class="p-4 text-sm text-gray-500">No detailed monthly log available for this staff member.</p>';
+                                 }
+                             }
+                         }
+                    }
+
+                    button.addEventListener('click', (e) => {
+                        const targetButton = e.currentTarget;
+                        const staffRow = targetButton.closest('.staff-row');
+                        const detailRow = staffRow ? staffRow.nextElementSibling : null;
+
+                        if (detailRow && detailRow.classList.contains('attendance-detail-row')) {
+                            const isVisible = !detailRow.classList.contains('hidden');
+
+                            // Collapse all other detail rows
+                            document.querySelectorAll('.attendance-detail-row').forEach(row => {
+                                if (row !== detailRow) {
+                                    row.classList.add('hidden');
+                                    const prevButton = row.previousElementSibling.querySelector('.btn-view-attendance');
+                                    if (prevButton) { prevButton.textContent = '▶'; }
+                                }
+                            });
+
+                            detailRow.classList.toggle('hidden');
+                            targetButton.textContent = isVisible ? '▶' : '▼';
+
+                            updateExpandAllButton();
+                        }
+                    });
+                });
+            };
+
+            // Logic for Expand All / Collapse All
+            const expandAllButton = document.getElementById('expand-all-btn');
+            const allDetailRows = document.querySelectorAll('.attendance-detail-row');
+            const allToggleButtons = document.querySelectorAll('.btn-view-attendance');
+
+            function updateExpandAllButton() {
+                 // Check if any detail row is currently visible
+                 const anyVisible = Array.from(allDetailRows).some(row => !row.classList.contains('hidden'));
+                 if (expandAllButton) {
+                     expandAllButton.textContent = anyVisible ? 'Collapse All' : 'Expand All';
+                 }
+
+                 allToggleButtons.forEach(button => {
+                    const staffRow = button.closest('.staff-row');
+                    const detailRow = staffRow ? staffRow.nextElementSibling : null;
+                    if(detailRow) {
+                        const isRowVisible = !detailRow.classList.contains('hidden');
+                        button.textContent = isRowVisible ? '▼' : '▶';
+                    }
+                 });
+            }
+
+            if (expandAllButton) {
+                expandAllButton.addEventListener('click', () => {
+                    const isCollapsing = expandAllButton.textContent.includes('Collapse');
+
+                    allDetailRows.forEach(row => { row.classList.toggle('hidden', isCollapsing); });
+                    updateExpandAllButton();
+                });
+            }
+            
+            // Staff Directory Form Logic (Restored)
+            const showAddStaffFormBtn = document.getElementById('show-add-staff-form');
+            const cancelAddStaffBtn = document.getElementById('cancel-add-staff');
+            const addStaffForm = document.getElementById('add-staff-form');
+            const ftStaffTableBody = document.getElementById('ft-staff-table-body');
+            const ahStaffTableBody = document.getElementById('ah-staff-table-body');
+
+            if (showAddStaffFormBtn) {
+                showAddStaffFormBtn.addEventListener('click', () => { setActiveView(addStaffView, navStaffDirectory); });
+            }
+            if (cancelAddStaffBtn) {
+                cancelAddStaffBtn.addEventListener('click', () => { setActiveView(staffDirectoryView, navStaffDirectory); addStaffForm.reset(); });
+            }
+
+            if (addStaffForm) {
+                addStaffForm.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    const name = document.getElementById('staff-name').value;
+                    const phone = document.getElementById('staff-phone').value;
+                    const farm = document.getElementById('staff-farm-location').value;
+                    const type = document.getElementById('staff-employment-type').value;
+
+                    // Note: Staff ID generation is omitted here but would be necessary in a real system.
+                    const mockId = (type === 'ft' ? 'FT' : 'AH') + Math.floor(Math.random() * 999); 
+
+                    const newRowHtml = `
+                        <tr>
+                            <td>${name}</td>
+                            <td>${phone}</td>
+                            <td>${farm}</td>
+                            <td>${mockId}</td>
+                        </tr>
+                    `;
+
+                    if (type === 'ft') {
+                        // ftStaffTableBody.insertAdjacentHTML('beforeend', newRowHtml); // Replaced by filter call
+                    } else if (type === 'ah') {
+                        // ahStaffTableBody.insertAdjacentHTML('beforeend', newRowHtml); // Replaced by filter call
+                    }
+
+                    // Also add to mock staff data so filters can see it (if refreshed)
+                    staffData[mockId] = { name: name, type: type.toUpperCase(), location: farm, phone: phone };
+                    
+                    // RENDER a fresh table based on the new data, respecting filters
+                    const currentLocationFilter = document.getElementById('filter-staff-location').value;
+                    filterStaffDirectoryTables(currentLocationFilter);
+
+                    addStaffForm.reset();
+                    setActiveView(staffDirectoryView, navStaffDirectory);
+                    console.log('New staff added (mocked):', staffData[mockId]);
+                });
+            }
+
+
+            // Initial Setup Calls
+            initializeMusterRoll();
+            updateExpandAllButton();
+            renderMonthViewCalendar();
+            renderIndividualLogTable(mockDailyLog);
+            populateFilters();
+            filterStaffDirectoryTables(document.getElementById('filter-staff-location')?.value || ""); // Call on initial load
+        });
+
+    </script>
+
+</body>
+</html>
+
+
